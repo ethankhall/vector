@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "build": "parcel build ./assets/index.html --no-minify --no-cache",
+    "build": "parcel build ./assets/index.html",
     "start": "parcel ./assets/index.html --no-cache --open"
   },
   "devDependencies": {
