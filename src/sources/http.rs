@@ -30,6 +30,9 @@ pub struct SimpleHttpConfig {
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    strict_path: bool,
+    url_path: String,
+    path_key: String,
 }
 
 inventory::submit! {
@@ -45,6 +48,9 @@ impl GenerateConfig for SimpleHttpConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
+            url_path: "/".to_string(),
+            strict_path: true,
+            path_key: "path".to_string(),
         })
         .unwrap()
     }
@@ -55,6 +61,7 @@ struct SimpleHttpSource {
     encoding: Encoding,
     headers: Vec<String>,
     query_parameters: Vec<String>,
+    path_key: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
@@ -78,13 +85,7 @@ impl HttpSource for SimpleHttpSource {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
-            .map(|events| {
-                if request_path.len() > 1 {
-                    add_path(events, request_path)
-                } else {
-                    events
-                }
-            })
+            .map(|events| add_path(events, self.path_key.as_str(), request_path))
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
@@ -110,8 +111,9 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
+            path_key: self.path_key.clone(),
         };
-        source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
+        source.run(self.address, &self.url_path.as_str(), self.strict_path, &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -127,11 +129,11 @@ impl SourceConfig for SimpleHttpConfig {
     }
 }
 
-fn add_path(mut events: Vec<Event>, path: &str) -> Vec<Event> {
+fn add_path(mut events: Vec<Event>, key: &str, path: &str) -> Vec<Event> {
     for event in events.iter_mut() {
         event
             .as_mut_log()
-            .insert("vector_http_path", Value::from(path.to_string()));
+            .insert(key, Value::from(path.to_string()));
     }
 
     events
