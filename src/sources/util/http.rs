@@ -186,7 +186,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     fn run(
         self,
         address: SocketAddr,
-        // path: &'static str,
         path: &str,
         strict_path: bool,
         tls: &Option<TlsConfig>,
@@ -196,12 +195,11 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
+        let path = String::from(path).clone();
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
-            let filter: BoxedFilter<()> = warp::post().boxed();
-            // let filter: dyn Filter<Extract = (), Error = Rejection> = warp::post();
+            let mut filter: BoxedFilter<()> = warp::post().boxed();
             for s in path.split('/').filter(|&x| !x.is_empty()) {
-                // filter = filter.and(warp::path(s));
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
             if strict_path {
